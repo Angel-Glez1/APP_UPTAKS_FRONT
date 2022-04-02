@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom'
+import useAdmin from '../../hooks/useAdmin';
 import useProyectos from '../../hooks/useProyectos';
 import Alerta from '../Alerta';
 import Colaborador from '../colaboradores/Colaborador';
@@ -7,12 +8,19 @@ import ModalEliminarColaborador from '../colaboradores/ModalEliminarColaborador'
 import ModalEliminarTarea from '../tareas/ModalEliminarTarea';
 import ModalFormularioTarea from '../tareas/ModalFormTareas';
 import Tarea from '../tareas/Tarea';
+import io from 'socket.io-client';
+
+let socket;
 
 
 const Proyecto = () => {
 
     const { id } = useParams();
-    const { obtenerProyecto, proyecto, cargando, handleModalTareas, alerta } = useProyectos();
+    const { obtenerProyecto, proyecto, cargando, handleModalTareas, alerta,
+        submitTareasProyectos, eliminarTareasProyecto, actualizarTareas,
+        estadoTarea
+    } = useProyectos();
+    const admin = useAdmin();
 
 
     useEffect(() => {
@@ -22,7 +30,40 @@ const Proyecto = () => {
     }, [id]);
 
 
-    // console.log(proyecto);
+    useEffect(() => {
+        socket = io(import.meta.env.VITE_URL_BACKEND);
+        socket.emit('abrir-proyecto', id);
+    }, []);
+
+
+    useEffect(() => {
+
+        socket.on('tarea-agregada', (NuevaTarea) => {
+            if (NuevaTarea.proyecto === proyecto._id) {
+                submitTareasProyectos(NuevaTarea)
+            }
+        });
+
+        socket.on('tarea-eliminada', tareaEliminada => {
+            if (tareaEliminada.proyecto === proyecto._id) {
+                eliminarTareasProyecto(tareaEliminada);
+            }
+        });
+
+        socket.on('tarea-actulizada', tareaActualizada => {         
+            if (tareaActualizada.proyecto._id === proyecto._id) {
+                actualizarTareas(tareaActualizada);
+            }
+        });
+
+        socket.on('tarea-estado', tareaEstado => {
+            if (tareaEstado.proyecto._id === proyecto._id) {
+                estadoTarea(tareaEstado);
+            }
+        });
+
+
+    })
 
     const { nombre } = proyecto;
 
@@ -38,20 +79,26 @@ const Proyecto = () => {
 
 
     return (
+
+
         <>
             <div className='flex justify-between items-center'>
                 <h1 className="font-black text-4xl">{nombre}</h1>
+                {
+                    admin && (
+                        <Link to={`/proyectos/editar/${id}`}>
 
-                <Link to={`/proyectos/editar/${id}`}>
+                            <div className='flex justify-between items-center gap-3 cursor-pointer text-gray-700 hover:text-black'>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
 
-                    <div className='flex justify-between items-center gap-3 cursor-pointer text-gray-700 hover:text-black'>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
+                                <span>Editar</span>
+                            </div>
+                        </Link>
+                    )
+                }
 
-                        <span>Editar</span>
-                    </div>
-                </Link>
             </div>
 
 
@@ -78,6 +125,10 @@ const Proyecto = () => {
                 </div>
             )}
 
+
+
+
+
             <div className='bg-white shadow mt-10 rounded-lg'>
                 {
                     proyecto.tareas?.length
@@ -92,34 +143,50 @@ const Proyecto = () => {
 
             </div>
 
-            <div className="flex items-center justify-between mt-10">
-                <p className="font-bold text-xl">Colaboradores</p>
-                <Link
-                    to={`/proyectos/nuevo-colaborador/${proyecto._id}`}
-                    className='text-gray-400 uppercase font-bold hover:text-black'
-                >
-                    Añadir
-                </Link>
-            </div>
 
-            <div className='bg-white shadow mt-10 rounded-lg'>
-                {
-                    proyecto.colaboradores?.length
-                        ? proyecto.colaboradores?.map(colaborador => (
-                            <Colaborador
-                                key={colaborador._id}
-                                colaborador={colaborador}
-                            />
-                        ))
-                        : (<p className='text-center my-5 p-10' > No hay colaboradores </p>)
-                }
+            {
+                admin && (
+                    <>
+                        <div className="flex items-center justify-between mt-10">
+                            <p className="font-bold text-xl">Colaboradores</p>
+                            <Link
+                                to={`/proyectos/nuevo-colaborador/${proyecto._id}`}
+                                className='text-gray-400 uppercase font-bold hover:text-black'
+                            >
+                                Añadir
+                            </Link>
+                        </div>
 
-            </div>
+                        <div className='bg-white shadow mt-10 rounded-lg'>
+                            {
+                                proyecto.colaboradores?.length
+                                    ? proyecto.colaboradores?.map(colaborador => (
+                                        <Colaborador
+                                            key={colaborador._id}
+                                            colaborador={colaborador}
+                                        />
+                                    ))
+                                    : (<p className='text-center my-5 p-10' > No hay colaboradores </p>)
+                            }
+
+                        </div>
+                    </>
+                )
+
+            }
+
+
+
+
+
 
             <ModalFormularioTarea />
             <ModalEliminarTarea />
             <ModalEliminarColaborador />
+
         </>
+
+
 
     )
 }

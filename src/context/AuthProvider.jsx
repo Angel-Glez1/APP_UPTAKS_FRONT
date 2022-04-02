@@ -55,13 +55,18 @@ const AuthProvider = ({ children }) => {
 
     const login = (user) => setAuth(user);
 
+    const logout = () => {
+        setAuth({})
+        localStorage.removeItem('token-uptaks');
+    };
 
     return (
         <AuthContext.Provider
             value={{
                 login,
                 auth,
-                cargando
+                cargando,
+                logout
 
             }}
         >
